@@ -1,4 +1,4 @@
-"""
+﻿"""
 TPL Comment Extractor — Web Application
 ========================================
 Streamlit front-end for generating TPL Comments Excel sheets.
@@ -173,10 +173,38 @@ def build_excel(rows: list, debug_rows: list, output_path: str):
     wb.save(output_path)
 
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# ── PASSWORD PROTECTION ────────────────────────────────────────────────────
+PASSWORD = "admin123"  # Change this to your secure password!
+
+def check_password():
+    """Returns True if password is correct"""
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if not st.session_state.password_correct:
+        st.markdown("### 🔐 Login Required")
+        with st.form("password_form"):
+            password = st.text_input("Enter password:", type="password")
+            submitted = st.form_submit_button("Login")
+            
+            if submitted:
+                if password == PASSWORD:
+                    st.session_state.password_correct = True
+                    st.success("✅ Login successful!")
+                    st.rerun()
+                else:
+                    st.error("❌ Incorrect password. Try again.")
+        return False
+    return True
+
+# Check password before showing app
+if not check_password():
+    st.stop()
+
+# ─────────────────────────────────────────────────────────────────────────────# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="TPL Comment Extractor",
-    page_icon="📄",
+    page_icon="ðﾟﾓﾄ",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
