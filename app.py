@@ -101,45 +101,65 @@ def build_excel(rows: list, debug_rows: list, output_path: str):
     left_align  = Alignment(horizontal="left",   vertical="top", wrap_text=True)
     center_align= Alignment(horizontal="center", vertical="top", wrap_text=False)
 
-    for row_idx, row in enumerate(rows, 2):
-        has_comment = bool(row.get("customer_comments", "").strip())
-        row_fill    = cmt_fill if has_comment else (alt_fill if row_idx % 2 == 0 else white_fill)
+    xl_row = 2  # physical spreadsheet row (advances per comment line)
+    for row in rows:
+        comment_list = row.get("comment_list") or []
+        remarks      = row.get("xylem_remarks", "")
+        # Each submittal occupies max(1, number_of_comments) physical rows.
+        n_lines = max(1, len(comment_list))
+        block_start = xl_row
 
-        # Sr No
-        c = ws.cell(row=row_idx, column=1, value=row.get("sr_no", row_idx - 1))
-        c.font = sr_font; c.fill = row_fill; c.alignment = center_align; c.border = border
+        for k in range(n_lines):
+            first = (k == 0)
+            has_comment = bool(comment_list)
+            row_fill = cmt_fill if has_comment else (alt_fill if xl_row % 2 == 0 else white_fill)
 
-        # Submittal
-        c = ws.cell(row=row_idx, column=2, value=row.get("submittal", ""))
-        c.font = sub_font; c.fill = row_fill; c.alignment = left_align; c.border = border
+            # Sr No — only on the first row of the block
+            c = ws.cell(row=xl_row, column=1, value=(row.get("sr_no") if first else None))
+            c.font = sr_font; c.fill = row_fill; c.alignment = center_align; c.border = border
 
-        # Document
-        c = ws.cell(row=row_idx, column=3, value=row.get("document", ""))
-        c.font = base_font; c.fill = row_fill; c.alignment = left_align; c.border = border
+            # Submittal — only on the first row
+            c = ws.cell(row=xl_row, column=2, value=(row.get("submittal", "") if first else None))
+            c.font = sub_font; c.fill = row_fill; c.alignment = left_align; c.border = border
 
-        # Customer Comments
-        comments = row.get("customer_comments", "")
-        c = ws.cell(row=row_idx, column=4, value=comments)
-        c.font = cmt_font if comments else base_font
-        c.fill = row_fill; c.alignment = left_align; c.border = border
+            # Document — only on the first row
+            c = ws.cell(row=xl_row, column=3, value=(row.get("document", "") if first else None))
+            c.font = base_font; c.fill = row_fill; c.alignment = left_align; c.border = border
 
-        # Xylem Remarks
-        remarks = row.get("xylem_remarks", "")
-        c = ws.cell(row=row_idx, column=5, value=remarks)
-        c.font = cnr_font if remarks == "Comment not Received" else base_font
-        c.fill = cnr_fill if remarks == "Comment not Received" else row_fill
-        c.alignment = left_align; c.border = border
+            # Customer Comments — one comment per row
+            cmt_val = comment_list[k] if comment_list else ""
+            c = ws.cell(row=xl_row, column=4, value=cmt_val)
+            c.font = cmt_font if cmt_val else base_font
+            c.fill = row_fill; c.alignment = left_align; c.border = border
 
-        # Auto row height for wrapped text (approx)
-        doc_lines = len(row.get("document", "").split("\n"))
-        cmt_lines = max(1, len([l for l in row.get("customer_comments","").split("\n") if l.strip()]))
-        ws.row_dimensions[row_idx].height = max(18, max(doc_lines, cmt_lines) * 14)
+            # Xylem Remarks — only on the first row
+            rem_val = remarks if first else None
+            c = ws.cell(row=xl_row, column=5, value=rem_val)
+            c.font = cnr_font if rem_val == "Comment not Received" else base_font
+            c.fill = cnr_fill if rem_val == "Comment not Received" else row_fill
+            c.alignment = left_align; c.border = border
+
+            # Row height: size to the comment text on this row
+            wrapped = max(1, len(cmt_val) // 60 + 1)
+            ws.row_dimensions[xl_row].height = max(18, wrapped * 14)
+
+            xl_row += 1
+
+        # Merge Sr No / Submittal / Document / Remarks down the block so the
+        # submittal info visually spans all of its comment rows (like the template).
+        if n_lines > 1:
+            block_end = xl_row - 1
+            for col in (1, 2, 3, 5):
+                ws.merge_cells(start_row=block_start, start_column=col,
+                               end_row=block_end,   end_column=col)
+
+    last_row = xl_row - 1
 
     # ── Freeze top row ────────────────────────────────────────────────────────
     ws.freeze_panes = "A2"
 
     # ── Auto filter ───────────────────────────────────────────────────────────
-    ws.auto_filter.ref = f"A1:E{len(rows)+1}"
+    ws.auto_filter.ref = f"A1:E{last_row}"
 
     # ── Debug sheet — All Annotations ────────────────────────────────────────
     if debug_rows:

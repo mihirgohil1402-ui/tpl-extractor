@@ -93,21 +93,23 @@ def run_extraction(zip_paths: list, progress_cb=None) -> ExtractionResult:
 
             # Renumber comments continuously for the whole submittal:
             # strip each comment's original (per-page) number, then number 1..N.
+            comment_list = []
             if has_comments:
                 cleaned = []
                 for c in raw['comments']:
                     stripped = re.sub(r'^\s*\d+\s*[\.\)]\s*', '', c).strip()
                     if stripped:
                         cleaned.append(stripped)
-                comments_text = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cleaned))
-            else:
-                comments_text = ''
+                comment_list = [f"{i+1}. {c}" for i, c in enumerate(cleaned)]
 
             result.rows.append({
                 'sr_no':             sr,
                 'submittal':         sub,
                 'document':          raw['doc_name'] or '',
-                'customer_comments': comments_text,
+                # Joined string kept for the on-screen preview; the list drives
+                # one-row-per-comment expansion in build_excel().
+                'customer_comments': "\n".join(comment_list),
+                'comment_list':      comment_list,
                 'xylem_remarks':     '' if has_comments else 'Comment not Received',
             })
 
@@ -123,6 +125,7 @@ def run_extraction(zip_paths: list, progress_cb=None) -> ExtractionResult:
                 'submittal':         sub,
                 'document':          '',
                 'customer_comments': '',
+                'comment_list':      [],
                 'xylem_remarks':     f'Extraction error: {exc}',
             })
 
