@@ -198,45 +198,81 @@ def extract_comments_from_pdf(pdf_bytes, fname):
                     seen.add(key)
                     comments.append(clean)
 
-        # ── METHOD 2: Red text embedded in page content ───────────────────────
+        # ── METHOD 2: Reviewer-ink text, grouped spatially into comments ──────
+        # Reviewer comments are blue (sometimes red) text drawn on the page.
+        # A NEW comment starts when a line begins with a number (1. / 2)) OR
+        # when there is a large vertical gap from the previous ink line
+        # (i.e. a separate callout elsewhere on the drawing). Otherwise the
+        # line is a continuation of the current comment. This mirrors how the
+        # comments are laid out visually and avoids both over-splitting
+        # (every line = a comment) and over-merging (everything = one comment).
         blocks = page.get_text("dict")["blocks"]
-        red_lines = []
+        ink_lines = []  # (top, x0, text)
         for b in blocks:
             if b.get("type") != 0:
                 continue
             for line in b.get("lines", []):
                 line_text = ""
-                is_red_line = False
+                is_ink_line = False
+                xs, ys = [], []
                 for span in line.get("spans", []):
                     if is_red_span(span.get("color", 0)):
-                        is_red_line = True
+                        is_ink_line = True
                     line_text += span.get("text", "")
-                if is_red_line and line_text.strip():
-                    red_lines.append(line_text.strip())
+                    bb = span.get("bbox")
+                    if bb:
+                        xs.append(bb[0]); ys.append(bb[1])
+                if is_ink_line and line_text.strip():
+                    ink_lines.append({
+                        "top": min(ys) if ys else 0.0,
+                        "x0":  min(xs) if xs else 0.0,
+                        "txt": line_text.strip(),
+                    })
 
-        if red_lines:
-            NUMBERED = re.compile(r'^\s*\d+[\.\)]\s*')
+        if ink_lines:
+            # sort top-to-bottom, then left-to-right
+            ink_lines.sort(key=lambda d: (round(d["top"]), d["x0"]))
+
+            NUMBERED = re.compile(r'^\s*\d+\s*[\.\)]\s*(.*)')
+            SECTION_HDR = re.compile(r'^(clarification|clarifications required|clarification required)', re.I)
+            VGAP = 22.0   # vertical gap (pts) that signals a new separate comment
+
             entries = []
-            preamble = []
+            cur = None
+            last_top = None
+            raw_dump = []
 
-            for line in red_lines:
-                if NUMBERED.match(line):
-                    if preamble:
-                        prefix = " ".join(preamble) + " — "
-                        preamble = []
-                    else:
-                        prefix = ""
-                    entries.append(prefix + line.strip())
+            for ln in ink_lines:
+                raw_dump.append(ln["txt"])
+                txt = ln["txt"]
+
+                # Drop pure section headers ("Clarifications required ...")
+                if SECTION_HDR.match(txt):
+                    if cur:
+                        entries.append(cur); cur = None
+                    last_top = ln["top"]
+                    continue
+
+                m = NUMBERED.match(txt)
+                gap = (ln["top"] - last_top) if last_top is not None else 0.0
+                start_new = bool(m) or (cur is not None and gap > VGAP)
+
+                if start_new:
+                    if cur:
+                        entries.append(cur)
+                    cur = (m.group(1) if m else txt).strip()
                 else:
-                    if entries:
-                        entries.append(line.strip())
-                    else:
-                        preamble.append(line.strip())
+                    cur = (cur + " " + txt).strip() if cur else txt.strip()
 
-            if preamble:
-                entries.append(" ".join(preamble))
+                last_top = ln["top"]
+
+            if cur:
+                entries.append(cur)
 
             for entry in entries:
+                entry = entry.strip()
+                if len(entry) < 3:
+                    continue
                 key = entry.lower()[:80]
                 if key not in seen:
                     seen.add(key)
@@ -244,9 +280,9 @@ def extract_comments_from_pdf(pdf_bytes, fname):
 
             debug.append({
                 'file': fname, 'page': pnum+1,
-                'type': 'RedText (embedded)',
-                'author': 'Reviewer (red ink)',
-                'content': " | ".join(red_lines)[:200],
+                'type': 'ReviewerInk (spatial-grouped)',
+                'author': 'Reviewer (blue/red ink)',
+                'content': " | ".join(raw_dump)[:200],
                 'actionable': True
             })
 
