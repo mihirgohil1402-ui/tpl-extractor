@@ -1,4 +1,4 @@
-﻿"""
+"""
 TPL Extractor — Adapter
 =======================
 Thin bridge between app.py (Streamlit UI) and extractor/engine/core.py.
@@ -92,26 +92,31 @@ def run_extraction(zip_paths: list, progress_cb=None) -> ExtractionResult:
             has_comments = bool(raw['comments'])
 
             if has_comments:
-                # Expand into multiple rows: one per comment
-                # First row has Sr No, Submittal, Document; continuation rows have None
-                for idx, comment in enumerate(raw['comments']):
-                    result.rows.append({
-                        'sr_no':             sr if idx == 0 else None,
-                        'submittal':         sub if idx == 0 else None,
-                        'document':          raw['doc_name'] if idx == 0 else None,
-                        'customer_comments': comment,
-                        'xylem_remarks':     '' if idx == 0 else None,
-                    })
+                # RENUMBER comments sequentially (1, 2, 3, etc.) - ignore original numbering
+                renumbered = []
+                for comment in raw['comments']:
+                    # Strip original numbering prefix (e.g., "10. " or "9. " from different pages)
+                    clean = re.sub(r'^\s*\d+[\.\)]\s+', '', comment).strip()
+                    if clean:
+                        renumbered.append(clean)
+                
+                # Now renumber sequentially
+                final_comments = [f"{i+1}. {c}" for i, c in enumerate(renumbered)]
+                comments_text = "\n".join(final_comments)
+            else:
+                comments_text = ''
+
+            result.rows.append({
+                'sr_no':             sr,
+                'submittal':         sub,
+                'document':          raw['doc_name'] or '',
+                'customer_comments': comments_text,
+                'xylem_remarks':     '' if has_comments else 'Comment not Received',
+            })
+
+            if has_comments:
                 result.with_comments += 1
             else:
-                # No comments: single row with "Comment not Received"
-                result.rows.append({
-                    'sr_no':             sr,
-                    'submittal':         sub,
-                    'document':          raw['doc_name'] or '',
-                    'customer_comments': '',
-                    'xylem_remarks':     'Comment not Received',
-                })
                 result.no_comments += 1
 
         except Exception as exc:
