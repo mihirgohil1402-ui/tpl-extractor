@@ -30,18 +30,13 @@ def is_actionable_annotation(annot_type, author, content):
         return False
     return True
 
-RED_MIN_R, RED_MAX_G, RED_MAX_B = 100, 120, 100
+RED_MIN_R, RED_MAX_G, RED_MAX_B = 150, 100, 100
 
 def is_red_span(color_int):
     r = (color_int >> 16) & 0xFF
     g = (color_int >> 8) & 0xFF
     b = color_int & 0xFF
-    # Improved detection: catches more red variants
-    if r > 150 and g < 100 and b < 100:  # Bright red
-        return True
-    if r > 100 and g < 80 and b < 80 and r > g and r > b:  # Dark red
-        return True
-    return False
+    return r > RED_MIN_R and g < RED_MAX_G and b < RED_MAX_B
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
 
@@ -61,7 +56,7 @@ def parse_doc_name_from_filename(pdf_filename):
 DOC_NO_RE   = re.compile(r'T?TPL[-–][\w][-–\w]+[-–]\d+', re.I)
 SUBJECT_RE  = re.compile(r'Subject\s*[:\-]?\s*(.+)', re.I)
 DOCNO_LABEL = re.compile(r'DOC\s*NO\s*[:\-]?\s*(T?TPL[-–][\w][-–\w]+[-–]\d+)', re.I)
-EQUIP_TAG   = re.compile(r'\s*\(?[^)]*(?:WTP|VFD|VFR|DWTP|CWTP|A[-/]B|A[-/]B[-/]C|A[-/]B[-/]C[-/]D)\d*[^)]*\)?\s*$', re.I)
+EQUIP_TAG   = re.compile(r'\s*\([^)]*(?:WTP|VFD|VFR|A[-/]B|A[-/]B[-/]C)\d*[^)]*\)\s*$', re.I)
 
 def _strip_equipment_tag(text):
     """Remove trailing equipment-tag suffixes like (WTP2-VFD-101 A/B/C/D)."""
@@ -96,17 +91,20 @@ def extract_doc_name_from_cover(cover_pdf_bytes):
             subject_value = m.group(1).strip()
             j = i + 1
             while j < len(lines):
-                open_b  = subject_value.count('(')
-                close_b = subject_value.count(')')
-                next_l  = lines[j].strip()
+                next_l = lines[j].strip()
+                # Stop if we've reached the next form field (Project:, Date:, etc.)
                 if NEW_FIELD.match(next_l):
-                    break
-                if open_b <= close_b:
                     break
                 subject_value += ' ' + next_l
                 j += 1
+                # Once the equipment-tag parentheses are balanced, the full
+                # title has been captured — stop. (Keeps the tag in the name.)
+                if subject_value.count('(') > 0 and \
+                   subject_value.count('(') <= subject_value.count(')'):
+                    break
             if DOC_NO_RE.search(subject_value):
-                return _strip_equipment_tag(subject_value), 'Subject field'
+                # Keep the FULL name including equipment tag (matches template)
+                return subject_value.strip(), 'Subject field'
 
     # ── Strategy 2: Contractor Submittal Ref No + reconstruct ────────────────
     for i, line in enumerate(lines):
@@ -115,7 +113,7 @@ def extract_doc_name_from_cover(cover_pdf_bytes):
             doc_no = m.group(1).strip()
             for j in range(max(0, i-5), min(len(lines), i+10)):
                 if DOC_NO_RE.search(lines[j]) and '_' in lines[j]:
-                    return _strip_equipment_tag(lines[j].strip()), 'Subject field'
+                    return lines[j].strip(), 'Subject field'
             return doc_no, 'Ref No only'
 
     return None, None
@@ -143,7 +141,7 @@ def extract_doc_no_from_technical_pdf(pdf_bytes):
                     title += ' ' + next_line
 
     if doc_no and title:
-        return f"{doc_no}_{_strip_equipment_tag(title)}", 'DOC NO + title block'
+        return f"{doc_no}_{title}", 'DOC NO + title block'
     if doc_no:
         return doc_no, 'DOC NO only'
     return None, None

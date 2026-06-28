@@ -91,18 +91,15 @@ def run_extraction(zip_paths: list, progress_cb=None) -> ExtractionResult:
 
             has_comments = bool(raw['comments'])
 
+            # Renumber comments continuously for the whole submittal:
+            # strip each comment's original (per-page) number, then number 1..N.
             if has_comments:
-                # RENUMBER comments sequentially (1, 2, 3, etc.) - ignore original numbering
-                renumbered = []
-                for comment in raw['comments']:
-                    # Strip original numbering prefix (e.g., "10. " or "9. " from different pages)
-                    clean = re.sub(r'^\s*\d+[\.\)]\s+', '', comment).strip()
-                    if clean:
-                        renumbered.append(clean)
-                
-                # Now renumber sequentially
-                final_comments = [f"{i+1}. {c}" for i, c in enumerate(renumbered)]
-                comments_text = "\n".join(final_comments)
+                cleaned = []
+                for c in raw['comments']:
+                    stripped = re.sub(r'^\s*\d+\s*[\.\)]\s*', '', c).strip()
+                    if stripped:
+                        cleaned.append(stripped)
+                comments_text = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cleaned))
             else:
                 comments_text = ''
 

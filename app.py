@@ -1,4 +1,4 @@
-﻿"""
+"""
 TPL Comment Extractor — Web Application
 ========================================
 Streamlit front-end for generating TPL Comments Excel sheets.
@@ -317,7 +317,7 @@ st.markdown("""
   <div>
     <div class="brand">TPL · Dholera Fab 1</div>
     <h1>Generate TPL Comment Sheets Automatically</h1>
-    <div class="sub">Upload ZIP packages → Extract Comments → Download Excel</div>
+    <div class="sub">Upload ZIP packages - Extract Comments - Download Excel</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -327,7 +327,7 @@ st.markdown("""
 if not ENGINE_AVAILABLE:
     st.markdown(f"""
     <div class="error-note">
-        <strong>⚠ Extraction engine not found.</strong><br/>
+        <strong>Warning: Extraction engine not found.</strong><br/>
         Make sure <code>extractor/extractor.py</code> exists in the project folder.<br/>
         Error: {ENGINE_ERROR}
     </div>
@@ -337,7 +337,7 @@ if not ENGINE_AVAILABLE:
 if not EXCEL_AVAILABLE:
     st.markdown("""
     <div class="error-note">
-        <strong>⚠ openpyxl not installed.</strong><br/>
+        <strong>Warning: openpyxl not installed.</strong><br/>
         Run: <code>pip install openpyxl</code>
     </div>
     """, unsafe_allow_html=True)
@@ -400,7 +400,7 @@ if uploaded_files:
     st.markdown('<div class="tpl-card">', unsafe_allow_html=True)
     st.markdown('<div class="tpl-section-label"><span class="dot"></span>Step 3 — Generate Excel</div>', unsafe_allow_html=True)
 
-    if st.button("⚡ Process & Generate Excel", use_container_width=True):
+    if st.button("Process & Generate Excel", use_container_width=True):
         progress_placeholder = st.empty()
         log_placeholder = st.empty()
 
@@ -416,31 +416,31 @@ if uploaded_files:
                 st.markdown(f'<div class="log-box">{"<br/>".join(log_entries[-20:])}</div>', unsafe_allow_html=True)
 
         try:
-            log_msg("ðﾟﾓﾋ Saving uploaded ZIPs to disk...")
+            log_msg("Saving uploaded ZIPs to disk...")
             temp_uploads = {}
             for f in uploaded_files:
                 temp_path = UPLOADS_DIR / f.name
                 with open(temp_path, "wb") as fh:
                     fh.write(f.getbuffer())
                 temp_uploads[f.name] = temp_path
-                log_msg(f"  ✓ {f.name}")
+                log_msg(f"  OK {f.name}")
 
-            log_msg("\nðﾟﾔﾍ Running extraction engine...")
+            log_msg("\nRunning extraction engine...")
             progress_bar.progress(33, text="Extracting comments...")
 
             result = run_extraction(list(temp_uploads.values()))
             st.session_state.result = result
 
-            log_msg(f"  ✓ Processed {len(temp_uploads)} file(s)")
-            log_msg(f"  ✓ Found {len(result.rows)} rows")
+            log_msg(f"  OK Processed {len(temp_uploads)} file(s)")
+            log_msg(f"  OK Found {len(result.rows)} rows")
 
-            log_msg("\nðﾟﾓﾝ Generating Excel file...")
+            log_msg("\nGenerating Excel file...")
             progress_bar.progress(66, text="Building Excel...")
 
             output_filename = f"TPL_Comments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             output_path = OUTPUTS_DIR / output_filename
 
-            build_excel(result.rows, result.debug, str(output_path))
+            build_excel(result.rows, getattr(result, 'debug_rows', []), str(output_path))
 
             with open(output_path, "rb") as fh:
                 st.session_state.excel_bytes = fh.read()
@@ -449,15 +449,15 @@ if uploaded_files:
             elapsed = time.time() - start_time
             st.session_state.elapsed = elapsed
 
-            log_msg(f"  ✓ Excel saved: {output_filename}")
-            log_msg(f"\n✅ Complete! ({elapsed:.1f}s)")
+            log_msg(f"  OK Excel saved: {output_filename}")
+            log_msg(f"\nOK Complete! ({elapsed:.1f}s)")
 
             progress_bar.progress(100, text="Done!")
 
-            st.success(f"✅ Extraction complete in {elapsed:.1f}s")
+            st.success(f"OK Extraction complete in {elapsed:.1f}s")
 
         except Exception as e:
-            log_msg(f"\n❌ ERROR: {str(e)}")
+            log_msg(f"\nERROR ERROR: {str(e)}")
             st.error(f"Extraction failed: {str(e)}")
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -517,7 +517,7 @@ if st.session_state.excel_bytes:
     """, unsafe_allow_html=True)
 
     st.download_button(
-        label=f"⬇  Download {st.session_state.excel_name}",
+        label=f"Download Download {st.session_state.excel_name}",
         data=st.session_state.excel_bytes,
         file_name=st.session_state.excel_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -530,7 +530,7 @@ if st.session_state.excel_bytes:
 # SECTION 6 — STORAGE MANAGEMENT (Footer)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("### ðﾟﾒﾾ Storage Management")
+st.markdown("### Storage Management")
 
 # Calculate storage
 def get_storage_size():
@@ -545,11 +545,11 @@ def get_storage_size():
 
 storage_mb = get_storage_size() / (1024 * 1024)
 if storage_mb >= 1024:
-    st.write(f"ðﾟﾓﾊ **Current storage:** {storage_mb / 1024:.2f} GB")
+    st.write(f"**Current storage:** {storage_mb / 1024:.2f} GB")
 else:
-    st.write(f"ðﾟﾓﾊ **Current storage:** {storage_mb:.2f} MB")
+    st.write(f"**Current storage:** {storage_mb:.2f} MB")
 
-if st.button("ðﾟﾗﾑ️ Clear All Storage", use_container_width=True):
+if st.button("Clear All Storage", use_container_width=True):
     try:
         if UPLOADS_DIR.exists():
             shutil.rmtree(UPLOADS_DIR)
@@ -560,10 +560,10 @@ if st.button("ðﾟﾗﾑ️ Clear All Storage", use_container_width=True):
         st.session_state.result = None
         st.session_state.excel_bytes = None
         st.session_state.excel_name = None
-        st.success("✅ Storage cleared! Ready for new uploads.")
+        st.success("OK Storage cleared! Ready for new uploads.")
         st.rerun()
     except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
+        st.error(f"ERROR Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
