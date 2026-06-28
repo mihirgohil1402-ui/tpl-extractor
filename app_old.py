@@ -1,4 +1,4 @@
-"""
+﻿"""
 TPL Comment Extractor — Web Application
 ========================================
 Streamlit front-end for generating TPL Comments Excel sheets.
@@ -124,8 +124,10 @@ def build_excel(rows: list, debug_rows: list, output_path: str):
         c.alignment = left_align; c.border = border
 
         # Auto row height for wrapped text (approx)
-        doc_lines = len(row.get("document", "").split("\n"))
-        cmt_lines = max(1, len([l for l in row.get("customer_comments","").split("\n") if l.strip()]))
+        doc = row.get("document", "") or ""
+        cmt = row.get("customer_comments","") or ""
+        doc_lines = len(str(doc).split("\n"))
+        cmt_lines = max(1, len([l for l in str(cmt).split("\n") if l.strip()]))
         ws.row_dimensions[row_idx].height = max(18, max(doc_lines, cmt_lines) * 14)
 
     # ── Freeze top row ────────────────────────────────────────────────────────
@@ -171,10 +173,38 @@ def build_excel(rows: list, debug_rows: list, output_path: str):
     wb.save(output_path)
 
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# ── PASSWORD PROTECTION ────────────────────────────────────────────────────
+PASSWORD = "admin123"  # Change this to your secure password!
+
+def check_password():
+    """Returns True if password is correct"""
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if not st.session_state.password_correct:
+        st.markdown("### 🔐 Login Required")
+        with st.form("password_form"):
+            password = st.text_input("Enter password:", type="password")
+            submitted = st.form_submit_button("Login")
+            
+            if submitted:
+                if password == PASSWORD:
+                    st.session_state.password_correct = True
+                    st.success("✅ Login successful!")
+                    st.rerun()
+                else:
+                    st.error("❌ Incorrect password. Try again.")
+        return False
+    return True
+
+# Check password before showing app
+if not check_password():
+    st.stop()
+
+# ─────────────────────────────────────────────────────────────────────────────# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="TPL Comment Extractor",
-    page_icon="📋",
+    page_icon="ðﾟﾓﾄ",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -363,62 +393,6 @@ st.markdown("""
 #MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
-
-
-# ── Storage Management (Sidebar) ──────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("### 💾 Storage Management")
-    
-    # Calculate storage usage
-    def get_storage_size():
-        total_size = 0
-        if UPLOADS_DIR.exists():
-            for file in UPLOADS_DIR.rglob("*"):
-                if file.is_file():
-                    total_size += file.stat().st_size
-        if OUTPUTS_DIR.exists():
-            for file in OUTPUTS_DIR.rglob("*"):
-                if file.is_file():
-                    total_size += file.stat().st_size
-        return total_size
-    
-    storage_bytes = get_storage_size()
-    storage_mb = storage_bytes / (1024 * 1024)
-    storage_gb = storage_mb / 1024
-    
-    # Display storage info
-    if storage_gb >= 1:
-        st.metric("Current Storage", f"{storage_gb:.2f} GB")
-    else:
-        st.metric("Current Storage", f"{storage_mb:.2f} MB")
-    
-    # Clear storage button
-    if st.button("🗑️ Clear All Storage", use_container_width=True):
-        try:
-            # Delete uploads
-            if UPLOADS_DIR.exists():
-                shutil.rmtree(UPLOADS_DIR)
-                UPLOADS_DIR.mkdir(exist_ok=True)
-            
-            # Delete outputs
-            if OUTPUTS_DIR.exists():
-                shutil.rmtree(OUTPUTS_DIR)
-                OUTPUTS_DIR.mkdir(exist_ok=True)
-            
-            # Reset session state
-            st.session_state.result = None
-            st.session_state.excel_bytes = None
-            st.session_state.excel_name = None
-            st.session_state.elapsed = None
-            st.session_state.log_lines = []
-            
-            st.success("✅ Storage cleared! Ready for new uploads.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"❌ Error clearing storage: {str(e)}")
-    
-    st.markdown("---")
 
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -641,11 +615,10 @@ if result is not None:
         import pandas as pd
         preview_data = []
         for row in result.rows:
-            doc = row.get("document","")
-            # Shorten for display
-            doc_short = doc[:80] + "…" if len(doc) > 80 else doc
-            cmt = row.get("customer_comments","")
-            cmt_short = cmt[:120] + "…" if len(cmt) > 120 else cmt
+            doc = row.get("document", "") or ""
+            cmt = row.get("customer_comments","") or ""
+            doc_short = doc[:80] + "_" if doc and len(doc) > 80 else (doc or "")
+            cmt_short = cmt[:60] + "…" if cmt and len(cmt) > 60 else (cmt or "")
             preview_data.append({
                 "Sr No": row.get("sr_no",""),
                 "Submittal": row.get("submittal",""),
