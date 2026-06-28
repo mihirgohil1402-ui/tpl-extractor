@@ -1,12 +1,7 @@
 """
-TPL Submittal Comment Extractor — ADVANCED Core Engine
-======================================================
-Improved extraction logic with:
-- Black text numbered comment detection
-- Advanced color recognition
-- Proper comment splitting & numbering
-- Full context preservation
-
+TPL Submittal Comment Extractor — Core Engine
+==============================================
+Original extraction logic. Do NOT modify this file when upgrading the UI.
 To run standalone: python core.py <folder_with_zips> <output.xlsx>
 
 Functions exposed to the adapter (extractor/extractor.py):
@@ -21,7 +16,7 @@ import fitz  # PyMuPDF
 NON_COMMENT_ANNOTATION_TYPES = {
     'Stamp', 'FileAttachment', 'Sound', 'Movie', 'Widget', 'Link', 'Watermark'
 }
-NON_COMMENT_AUTHORS = {'AutoCAD SHX Text', 'AutoCAD'}  # Removed 'USER'
+NON_COMMENT_AUTHORS = {'AutoCAD SHX Text', 'USER', 'AutoCAD'}
 
 def is_actionable_annotation(annot_type, author, content):
     """Return True if this PDF annotation is a real reviewer comment."""
@@ -35,31 +30,17 @@ def is_actionable_annotation(annot_type, author, content):
         return False
     return True
 
-# ── ADVANCED COLOR DETECTION ──────────────────────────────────────────────────
+RED_MIN_R, RED_MAX_G, RED_MAX_B = 100, 120, 100
 
 def is_red_span(color_int):
-    """
-    Improved red detection handles multiple red variants:
-    - Bright red: R>150
-    - Dark red: R>100 with G<R-50
-    - All variants where R > G and R > B
-    """
     r = (color_int >> 16) & 0xFF
     g = (color_int >> 8) & 0xFF
     b = color_int & 0xFF
-    
-    # Primary check: Bright red (R > 150)
-    if r > 150 and g < 100 and b < 100:
+    # Improved detection: catches more red variants
+    if r > 150 and g < 100 and b < 100:  # Bright red
         return True
-    
-    # Secondary check: Dark red (strong R dominance)
-    if r > 120 and g < 120 and b < 100:
+    if r > 100 and g < 80 and b < 80 and r > g and r > b:  # Dark red
         return True
-    
-    # Tertiary check: General red tone (R > G and R > B)
-    if r > 100 and r > g and r > b and (r - g) > 30:
-        return True
-    
     return False
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
@@ -80,12 +61,7 @@ def parse_doc_name_from_filename(pdf_filename):
 DOC_NO_RE   = re.compile(r'T?TPL[-–][\w][-–\w]+[-–]\d+', re.I)
 SUBJECT_RE  = re.compile(r'Subject\s*[:\-]?\s*(.+)', re.I)
 DOCNO_LABEL = re.compile(r'DOC\s*NO\s*[:\-]?\s*(T?TPL[-–][\w][-–\w]+[-–]\d+)', re.I)
-
-# IMPROVED: Handles DWTP(...) and CWTP(...) patterns with/without spaces
-EQUIP_TAG   = re.compile(
-    r'\s*\(?[^)]*(?:WTP|VFD|VFR|DWTP|CWTP|A[-/]B|A[-/]B[-/]C|A[-/]B[-/]C[-/]D)\d*[^)]*\)?\s*$',
-    re.I
-)
+EQUIP_TAG   = re.compile(r'\s*\(?[^)]*(?:WTP|VFD|VFR|DWTP|CWTP|A[-/]B|A[-/]B[-/]C|A[-/]B[-/]C[-/]D)\d*[^)]*\)?\s*$', re.I)
 
 def _strip_equipment_tag(text):
     """Remove trailing equipment-tag suffixes like (WTP2-VFD-101 A/B/C/D)."""
@@ -175,13 +151,7 @@ def extract_doc_no_from_technical_pdf(pdf_bytes):
 def extract_comments_from_pdf(pdf_bytes, fname):
     """
     Returns (comments_list, debug_list)
-    
-    ADVANCED: Extracts using 3 methods:
-    1. PDF Annotations (FreeText, Highlight, etc.)
-    2. Red Text (embedded in page)
-    3. Black Text Numbered Items (NEW!)
-    
-    comments_list: list of clean comment strings (NO [Page X] prefixes)
+    comments_list: list of clean comment strings
     debug_list: list of dicts with raw annotation info
     """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -193,31 +163,28 @@ def extract_comments_from_pdf(pdf_bytes, fname):
         page = doc[pnum]
 
         # ── METHOD 1: PDF annotation objects ─────────────────────────────────
-        if page.annots():
-            for a in page.annots():
-                atype = a.type[1]
-                author = a.info.get('title', '').strip()
-                content = a.info.get('content', '').strip()
+        for a in page.annots():
+            atype = a.type[1]
+            author = a.info.get('title', '').strip()
+            content = a.info.get('content', '').strip()
 
-                debug.append({
-                    'file': fname, 'page': pnum+1,
-                    'type': atype, 'author': author,
-                    'content': content[:200],
-                    'actionable': is_actionable_annotation(atype, author, content)
-                })
+            debug.append({
+                'file': fname, 'page': pnum+1,
+                'type': atype, 'author': author,
+                'content': content[:200],
+                'actionable': is_actionable_annotation(atype, author, content)
+            })
 
-                if is_actionable_annotation(atype, author, content):
-                    clean = content.replace('\r\n', '\n').replace('\r', '\n').strip()
-                    key = clean.lower()[:80]
-                    if key not in seen:
-                        seen.add(key)
-                        # NO [Page X] prefix - just the comment
-                        comments.append(clean)
+            if is_actionable_annotation(atype, author, content):
+                clean = content.replace('\r\n', '\n').replace('\r', '\n').strip()
+                key = clean.lower()[:80]
+                if key not in seen:
+                    seen.add(key)
+                    comments.append(clean)
 
         # ── METHOD 2: Red text embedded in page content ───────────────────────
         blocks = page.get_text("dict")["blocks"]
         red_lines = []
-        
         for b in blocks:
             if b.get("type") != 0:
                 continue
@@ -257,7 +224,6 @@ def extract_comments_from_pdf(pdf_bytes, fname):
                 key = entry.lower()[:80]
                 if key not in seen:
                     seen.add(key)
-                    # NO [Page X] prefix
                     comments.append(entry)
 
             debug.append({
@@ -267,55 +233,6 @@ def extract_comments_from_pdf(pdf_bytes, fname):
                 'content': " | ".join(red_lines)[:200],
                 'actionable': True
             })
-
-        # ── METHOD 3: Black text numbered/bulleted items (NEW!) ───────────────
-        text_lines = page.get_text("text").splitlines()
-        
-        # Patterns for potential comments
-        NUMBERED_ITEM = re.compile(r'^\s*(\d+[\.\)])\s+(.{10,})')
-        BULLETED_ITEM = re.compile(r'^\s*([•\-\*])\s+(.{10,})')
-        REVIEW_KEYWORDS = ['review', 'comment', 'note', 'action', 'provide', 'revise', 'update', 'verify', 'check', 'ensure']
-        
-        potential_comments = []
-        for line in text_lines:
-            line_stripped = line.strip()
-            if not line_stripped or len(line_stripped) < 15:
-                continue
-                
-            # Check numbered items
-            m = NUMBERED_ITEM.match(line)
-            if m:
-                potential_comments.append(line_stripped)
-                continue
-            
-            # Check bulleted items
-            m = BULLETED_ITEM.match(line)
-            if m:
-                potential_comments.append(line_stripped)
-                continue
-            
-            # Check for review keywords (indicates it's a comment)
-            if any(kw in line_stripped.lower() for kw in REVIEW_KEYWORDS):
-                if re.search(r'\b[A-Z][a-zA-Z]+.*[\.!?:;]', line_stripped):
-                    potential_comments.append(line_stripped)
-        
-        # Add black text comments if not already seen (and not red)
-        if potential_comments:
-            for comment in potential_comments:
-                key = comment.lower()[:80]
-                # Only add if not already captured by other methods
-                if key not in seen and not any(is_red_span(c) for c in [0] if False):
-                    # Basic check: not in red_lines already
-                    if not any(c.lower() in comment.lower() or comment.lower() in c.lower() for c in red_lines):
-                        seen.add(key)
-                        comments.append(comment)
-                        debug.append({
-                            'file': fname, 'page': pnum+1,
-                            'type': 'BlackText (numbered/bulleted)',
-                            'author': 'Reviewer (document text)',
-                            'content': comment[:200],
-                            'actionable': True
-                        })
 
     return comments, debug
 
@@ -407,6 +324,8 @@ def process_zip(zip_path):
 
 
 # ── STANDALONE ENTRY POINT ────────────────────────────────────────────────────
+# This block lets you run core.py directly for testing without the Streamlit UI.
+# It is never called by the web application.
 
 if __name__ == '__main__':
     import openpyxl
