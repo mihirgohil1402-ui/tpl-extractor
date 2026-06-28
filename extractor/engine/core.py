@@ -30,13 +30,31 @@ def is_actionable_annotation(annot_type, author, content):
         return False
     return True
 
-RED_MIN_R, RED_MAX_G, RED_MAX_B = 150, 100, 100
-
 def is_red_span(color_int):
+    """
+    Detect reviewer-ink text (kept name for compatibility).
+
+    On these submittals the reviewer writes in BLUE ink
+    (RGB ~ 0.31, 0.49, 0.91  ->  78, 125, 233), not red. Earlier versions
+    only matched red and therefore missed almost every comment.
+
+    fitz packs color as a 24-bit int 0xRRGGBB. We unpack to 0-255 R/G/B
+    and accept either dominant-blue or dominant-red ink, while rejecting
+    near-black body text and grey/teal document labels.
+    """
     r = (color_int >> 16) & 0xFF
     g = (color_int >> 8) & 0xFF
     b = color_int & 0xFF
-    return r > RED_MIN_R and g < RED_MAX_G and b < RED_MAX_B
+
+    # Blue reviewer ink: blue clearly dominant over both red and green
+    if b > 150 and (b - r) > 60 and (b - g) > 60:
+        return True
+
+    # Red reviewer ink (other submittals may use red): red clearly dominant
+    if r > 150 and (r - g) > 75 and (r - b) > 75:
+        return True
+
+    return False
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
 
