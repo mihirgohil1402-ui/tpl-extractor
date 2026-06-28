@@ -43,6 +43,13 @@ try:
 except ImportError:
     EXCEL_AVAILABLE = False
 
+# ── Pandas for preview ────────────────────────────────────────────────────────
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+
 
 def build_excel(rows: list, debug_rows: list, output_path: str):
     """
@@ -148,155 +155,94 @@ def build_excel(rows: list, debug_rows: list, output_path: str):
             cell = wd.cell(row=1, column=ci, value=h)
             cell.font = hfont; cell.fill = hfill
             cell.alignment = halign; cell.border = border
-        debug_col_widths = [12, 40, 6, 22, 20, 80, 18]
-        for ci, w in enumerate(debug_col_widths, 1):
-            wd.column_dimensions[get_column_letter(ci)].width = w
-        act_fill = PatternFill("solid", fgColor="E6FFE6")
-        for ri, d in enumerate(debug_rows, 2):
-            classified = "✅ COMMENT" if d.get("actionable") else "⛔ Not a comment"
-            vals = [
-                d.get("sub", ""), d.get("file", ""), d.get("page", ""),
-                d.get("type", ""), d.get("author", ""),
-                d.get("content", "")[:300], classified,
-            ]
-            for ci, val in enumerate(vals, 1):
+
+        for ri, row in enumerate(debug_rows, 2):
+            for ci, val in enumerate(row, 1):
                 cell = wd.cell(row=ri, column=ci, value=val)
-                cell.font = Font(name="Arial", size=9)
-                cell.alignment = Alignment(vertical="top", wrap_text=True)
+                cell.font = Font(name="Arial", size=8)
+                cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
                 cell.border = border
-                if d.get("actionable"):
-                    cell.fill = act_fill
-        wd.freeze_panes = "A2"
+
+        for ci in range(1, len(debug_headers) + 1):
+            wd.column_dimensions[get_column_letter(ci)].width = 16
 
     wb.save(output_path)
 
 
-# ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="TPL Comment Extractor",
-    page_icon="📋",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── CSS Styling ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── Base ── */
-[data-testid="stAppViewContainer"] {
-    background: #f5f4f0;
-}
-[data-testid="stHeader"] { display: none; }
-
-/* ── Main content width ── */
-.main .block-container {
-    max-width: 960px;
-    padding: 0 2rem 4rem;
+/* ── Page config ── */
+:root {
+    --primary-dark: #1E293B;
+    --primary-light: #0D6E3F;
+    --accent: #FBBF24;
 }
 
-/* ── App header ── */
+/* ── Body ── */
+body { font-family: 'Inter', -apple-system, sans-serif; background: #FAFBFC; }
+
+/* ── Header ── */
 .tpl-header {
-    background: #1e293b;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #2d3748 100%);
     color: white;
-    padding: 20px 32px;
-    margin: -1rem -2rem 2rem;
-    border-bottom: 3px solid #1a56db;
-    display: flex;
-    align-items: center;
-    gap: 16px;
+    padding: 28px 24px;
+    border-radius: 6px;
+    margin-bottom: 24px;
 }
-.tpl-header .brand {
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #94a3b8;
-}
-.tpl-header h1 {
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    color: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-.tpl-header .sub {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 2px;
-}
+.tpl-header .brand { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; opacity: 0.7; }
+.tpl-header h1 { font-size: 28px; font-weight: 700; margin: 8px 0 4px; }
+.tpl-header .sub { font-size: 13px; opacity: 0.8; font-weight: 500; }
 
-/* ── Section cards ── */
+/* ── Cards ── */
 .tpl-card {
     background: white;
-    border: 1px solid #e8e6e0;
-    border-radius: 8px;
-    padding: 24px 28px;
-    margin-bottom: 20px;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid #E2E8F0;
 }
+
+/* ── Section labels ── */
 .tpl-section-label {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
+    color: #475569;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #6b7280;
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #e8e6e0;
+    letter-spacing: 0.08em;
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-bottom: 16px;
 }
-.tpl-section-label .dot {
-    width: 6px; height: 6px;
-    background: #1a56db;
-    border-radius: 50%;
-    display: inline-block;
-}
+.tpl-section-label .dot { width: 8px; height: 8px; background: var(--primary-light); border-radius: 50%; }
 
 /* ── File chips ── */
 .file-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #f5f4f0;
-    border: 1px solid #e8e6e0;
-    border-radius: 4px;
-    padding: 5px 10px;
+    background: #F1F5F9;
+    border-left: 3px solid var(--primary-light);
+    padding: 8px 12px;
     font-size: 12px;
+    margin-bottom: 6px;
+    border-radius: 3px;
     font-family: 'Courier New', monospace;
-    margin: 3px;
 }
-.file-chip .ok { color: #0d6e3f; font-weight: 700; }
+.file-chip .ok { color: var(--primary-light); font-weight: 700; }
 
-/* ── Stats ── */
-.stats-row {
-    display: flex;
-    gap: 16px;
-    margin-top: 16px;
-}
+/* ── Stat boxes ── */
 .stat-box {
-    flex: 1;
-    background: #f5f4f0;
-    border: 1px solid #e8e6e0;
-    border-radius: 6px;
-    padding: 16px;
-    text-align: center;
+    background: white;
+    border-left: 3px solid #e5e7eb;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 3px;
+    font-size: 12px;
 }
-.stat-box .num {
-    font-size: 28px;
-    font-weight: 700;
-    font-family: 'Courier New', monospace;
-    color: #1a56db;
-}
-.stat-box .lbl {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #6b7280;
-    margin-top: 2px;
-}
-.stat-box.green .num { color: #0d6e3f; }
+.stat-box .label { color: #6b7280; font-weight: 500; }
+.stat-box .num { font-size: 18px; font-weight: 700; color: #1f2937; }
+.stat-box.green  .num { color: #0d6e3f; }
+.stat-box.blue   .num { color: #1e40af; }
+.stat-box.orange .num { color: #d97706; }
 .stat-box.amber .num { color: #b45309; }
 .stat-box.red   .num { color: #c0392b; }
 
@@ -363,62 +309,6 @@ st.markdown("""
 #MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
-
-
-# ── Storage Management (Sidebar) ──────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("### 💾 Storage Management")
-    
-    # Calculate storage usage
-    def get_storage_size():
-        total_size = 0
-        if UPLOADS_DIR.exists():
-            for file in UPLOADS_DIR.rglob("*"):
-                if file.is_file():
-                    total_size += file.stat().st_size
-        if OUTPUTS_DIR.exists():
-            for file in OUTPUTS_DIR.rglob("*"):
-                if file.is_file():
-                    total_size += file.stat().st_size
-        return total_size
-    
-    storage_bytes = get_storage_size()
-    storage_mb = storage_bytes / (1024 * 1024)
-    storage_gb = storage_mb / 1024
-    
-    # Display storage info
-    if storage_gb >= 1:
-        st.metric("Current Storage", f"{storage_gb:.2f} GB")
-    else:
-        st.metric("Current Storage", f"{storage_mb:.2f} MB")
-    
-    # Clear storage button
-    if st.button("🗑️ Clear All Storage", use_container_width=True):
-        try:
-            # Delete uploads
-            if UPLOADS_DIR.exists():
-                shutil.rmtree(UPLOADS_DIR)
-                UPLOADS_DIR.mkdir(exist_ok=True)
-            
-            # Delete outputs
-            if OUTPUTS_DIR.exists():
-                shutil.rmtree(OUTPUTS_DIR)
-                OUTPUTS_DIR.mkdir(exist_ok=True)
-            
-            # Reset session state
-            st.session_state.result = None
-            st.session_state.excel_bytes = None
-            st.session_state.excel_name = None
-            st.session_state.elapsed = None
-            st.session_state.log_lines = []
-            
-            st.success("✅ Storage cleared! Ready for new uploads.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"❌ Error clearing storage: {str(e)}")
-    
-    st.markdown("---")
 
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -504,148 +394,89 @@ if uploaded_files:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — GENERATE BUTTON + PROCESSING
+# SECTION 3 — PROCESS
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="tpl-card">', unsafe_allow_html=True)
-st.markdown('<div class="tpl-section-label"><span class="dot"></span>Step 3 — Generate Excel</div>', unsafe_allow_html=True)
-
-col_btn, col_tip = st.columns([1, 2])
-
-with col_btn:
-    generate_clicked = st.button(
-        "▶  Generate Excel",
-        type="primary",
-        disabled=not bool(uploaded_files),
-        use_container_width=True,
-    )
-
-with col_tip:
-    if not uploaded_files:
-        st.markdown("<span style='font-size:12px;color:#6b7280;'>Upload ZIP files first to enable processing.</span>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<span style='font-size:12px;color:#6b7280;'>Ready to process <strong>{len(uploaded_files)} submittal{'s' if len(uploaded_files)!=1 else ''}</strong>. Click Generate to start.</span>", unsafe_allow_html=True)
-
-
-# ── Processing ────────────────────────────────────────────────────────────────
-if generate_clicked and uploaded_files:
-    # Reset previous result
-    st.session_state.result      = None
-    st.session_state.excel_bytes = None
-    st.session_state.log_lines   = []
-
-    # Save uploaded files to temp disk location
-    session_id  = str(uuid.uuid4())[:8]
-    session_dir = UPLOADS_DIR / session_id
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    zip_paths = []
-    for uf in uploaded_files:
-        dest = session_dir / uf.name
-        dest.write_bytes(uf.read())
-        zip_paths.append(str(dest))
-
-    # UI elements for progress
-    status_text = st.empty()
-    progress_bar = st.progress(0)
-    log_placeholder = st.empty()
-    log_lines = []
-
-    def progress_cb(current: int, total: int, message: str):
-        pct = int((current / total) * 100) if total > 0 else 0
-        progress_bar.progress(pct)
-        status_text.markdown(f"<span style='font-size:13px;color:#1a56db;font-weight:600;'>{message}</span>", unsafe_allow_html=True)
-        log_lines.append(message)
-        log_html = "".join(f"<div>{ln}</div>" for ln in log_lines[-12:])
-        log_placeholder.markdown(f'<div class="log-box">{log_html}</div>', unsafe_allow_html=True)
-
-    # ── Run extraction ────────────────────────────────────────────────────────
-    t_start = time.time()
-    try:
-        result = run_extraction(
-            zip_paths=zip_paths,
-            progress_cb=progress_cb,
-        )
-        elapsed = round(time.time() - t_start, 1)
-        st.session_state.result  = result
-        st.session_state.elapsed = elapsed
-        progress_bar.progress(100)
-        status_text.markdown("<span style='font-size:13px;color:#0d6e3f;font-weight:600;'>✓ Extraction complete</span>", unsafe_allow_html=True)
-
-    except Exception as e:
-        st.markdown(f'<div class="error-note"><strong>Extraction failed:</strong> {str(e)}</div>', unsafe_allow_html=True)
-        st.stop()
-
-    # ── Build Excel ───────────────────────────────────────────────────────────
-    try:
-        ts         = datetime.now().strftime("%Y%m%d_%H%M%S")
-        excel_name = f"TPL_Comments_{ts}.xlsx"
-        excel_path = str(OUTPUTS_DIR / excel_name)
-        build_excel(result.rows, getattr(result, 'debug_rows', []), excel_path)
-        with open(excel_path, "rb") as f:
-            st.session_state.excel_bytes = f.read()
-        st.session_state.excel_name = excel_name
-    except Exception as e:
-        st.markdown(f'<div class="error-note"><strong>Excel generation failed:</strong> {str(e)}</div>', unsafe_allow_html=True)
-
-    # ── Cleanup temp uploads ──────────────────────────────────────────────────
-    try:
-        shutil.rmtree(session_dir)
-    except Exception:
-        pass
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — RESULTS
-# ═══════════════════════════════════════════════════════════════════════════════
-result = st.session_state.result
-
-if result is not None:
+if uploaded_files:
     st.markdown('<div class="tpl-card">', unsafe_allow_html=True)
-    st.markdown('<div class="tpl-section-label"><span class="dot"></span>Step 4 — Results</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tpl-section-label"><span class="dot"></span>Step 3 — Generate Excel</div>', unsafe_allow_html=True)
 
-    elapsed_str = f"{st.session_state.elapsed}s" if st.session_state.elapsed else "—"
+    if st.button("⚡ Process & Generate Excel", use_container_width=True):
+        progress_placeholder = st.empty()
+        log_placeholder = st.empty()
 
-    st.markdown(f"""
-    <div class="stats-row">
-        <div class="stat-box">
-            <div class="num">{result.total}</div>
-            <div class="lbl">Submittals Processed</div>
-        </div>
-        <div class="stat-box green">
-            <div class="num">{result.with_comments}</div>
-            <div class="lbl">With Comments</div>
-        </div>
-        <div class="stat-box amber">
-            <div class="num">{result.no_comments}</div>
-            <div class="lbl">Comment not Received</div>
-        </div>
-        <div class="stat-box">
-            <div class="num">{elapsed_str}</div>
-            <div class="lbl">Processing Time</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        with progress_placeholder.container():
+            progress_bar = st.progress(0, text="Starting extraction...")
 
-    # Non-fatal errors
-    if result.errors:
-        st.markdown("<br/>", unsafe_allow_html=True)
-        for err in result.errors:
-            st.markdown(f'<div class="error-note">⚠ {err}</div>', unsafe_allow_html=True)
+        start_time = time.time()
+        log_entries = []
 
-    # Preview table
-    if result.rows:
-        st.markdown("<br/><strong style='font-size:13px;'>Preview</strong>", unsafe_allow_html=True)
+        def log_msg(msg: str):
+            log_entries.append(msg)
+            with log_placeholder.container():
+                st.markdown(f'<div class="log-box">{"<br/>".join(log_entries[-20:])}</div>', unsafe_allow_html=True)
 
-        import pandas as pd
+        try:
+            log_msg("📋 Saving uploaded ZIPs to disk...")
+            temp_uploads = {}
+            for f in uploaded_files:
+                temp_path = UPLOADS_DIR / f.name
+                with open(temp_path, "wb") as fh:
+                    fh.write(f.getbuffer())
+                temp_uploads[f.name] = temp_path
+                log_msg(f"  ✓ {f.name}")
+
+            log_msg("\n🔍 Running extraction engine...")
+            progress_bar.progress(33, text="Extracting comments...")
+
+            result = run_extraction(list(temp_uploads.values()), debug=True)
+            st.session_state.result = result
+
+            log_msg(f"  ✓ Processed {len(temp_uploads)} file(s)")
+            log_msg(f"  ✓ Found {len(result.rows)} rows")
+
+            log_msg("\n📝 Generating Excel file...")
+            progress_bar.progress(66, text="Building Excel...")
+
+            output_filename = f"TPL_Comments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            output_path = OUTPUTS_DIR / output_filename
+
+            build_excel(result.rows, result.debug, str(output_path))
+
+            with open(output_path, "rb") as fh:
+                st.session_state.excel_bytes = fh.read()
+                st.session_state.excel_name = output_filename
+
+            elapsed = time.time() - start_time
+            st.session_state.elapsed = elapsed
+
+            log_msg(f"  ✓ Excel saved: {output_filename}")
+            log_msg(f"\n✅ Complete! ({elapsed:.1f}s)")
+
+            progress_bar.progress(100, text="Done!")
+
+            st.success(f"✅ Extraction complete in {elapsed:.1f}s")
+
+        except Exception as e:
+            log_msg(f"\n❌ ERROR: {str(e)}")
+            st.error(f"Extraction failed: {str(e)}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4 — PREVIEW
+# ═══════════════════════════════════════════════════════════════════════════════
+if st.session_state.result:
+    st.markdown('<div class="tpl-card">', unsafe_allow_html=True)
+    st.markdown('<div class="tpl-section-label"><span class="dot"></span>Step 4 — Preview</div>', unsafe_allow_html=True)
+
+    if PANDAS_AVAILABLE:
         preview_data = []
-        for row in result.rows:
-            doc = row.get("document","")
-            # Shorten for display
-            doc_short = doc[:80] + "…" if len(doc) > 80 else doc
-            cmt = row.get("customer_comments","")
-            cmt_short = cmt[:120] + "…" if len(cmt) > 120 else cmt
+        for row in st.session_state.result.rows:
+            doc = row.get("document", "") or ""
+            cmt = row.get("customer_comments","") or ""
+            doc_short = doc[:80] + "…" if doc and len(doc) > 80 else (doc or "")
+            cmt_short = cmt[:60] + "…" if cmt and len(cmt) > 60 else (cmt or "")
             preview_data.append({
                 "Sr No": row.get("sr_no",""),
                 "Submittal": row.get("submittal",""),
@@ -693,6 +524,46 @@ if st.session_state.excel_bytes:
         use_container_width=True,
     )
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 6 — STORAGE MANAGEMENT (Footer)
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.markdown("### 💾 Storage Management")
+
+# Calculate storage
+def get_storage_size():
+    total = 0
+    if UPLOADS_DIR.exists():
+        for f in UPLOADS_DIR.rglob("*"):
+            if f.is_file(): total += f.stat().st_size
+    if OUTPUTS_DIR.exists():
+        for f in OUTPUTS_DIR.rglob("*"):
+            if f.is_file(): total += f.stat().st_size
+    return total
+
+storage_mb = get_storage_size() / (1024 * 1024)
+if storage_mb >= 1024:
+    st.write(f"📊 **Current storage:** {storage_mb / 1024:.2f} GB")
+else:
+    st.write(f"📊 **Current storage:** {storage_mb:.2f} MB")
+
+if st.button("🗑️ Clear All Storage", use_container_width=True):
+    try:
+        if UPLOADS_DIR.exists():
+            shutil.rmtree(UPLOADS_DIR)
+            UPLOADS_DIR.mkdir(exist_ok=True)
+        if OUTPUTS_DIR.exists():
+            shutil.rmtree(OUTPUTS_DIR)
+            OUTPUTS_DIR.mkdir(exist_ok=True)
+        st.session_state.result = None
+        st.session_state.excel_bytes = None
+        st.session_state.excel_name = None
+        st.success("✅ Storage cleared! Ready for new uploads.")
+        st.rerun()
+    except Exception as e:
+        st.error(f"❌ Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
