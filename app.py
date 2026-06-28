@@ -1,4 +1,4 @@
-"""
+﻿"""
 TPL Comment Extractor — Web Application
 ========================================
 Streamlit front-end for generating TPL Comments Excel sheets.
@@ -416,7 +416,7 @@ if uploaded_files:
                 st.markdown(f'<div class="log-box">{"<br/>".join(log_entries[-20:])}</div>', unsafe_allow_html=True)
 
         try:
-            log_msg("📋 Saving uploaded ZIPs to disk...")
+            log_msg("ðﾟﾓﾋ Saving uploaded ZIPs to disk...")
             temp_uploads = {}
             for f in uploaded_files:
                 temp_path = UPLOADS_DIR / f.name
@@ -425,16 +425,16 @@ if uploaded_files:
                 temp_uploads[f.name] = temp_path
                 log_msg(f"  ✓ {f.name}")
 
-            log_msg("\n🔍 Running extraction engine...")
+            log_msg("\nðﾟﾔﾍ Running extraction engine...")
             progress_bar.progress(33, text="Extracting comments...")
 
-            result = run_extraction(list(temp_uploads.values()), debug=True)
+            result = run_extraction(list(temp_uploads.values()))
             st.session_state.result = result
 
             log_msg(f"  ✓ Processed {len(temp_uploads)} file(s)")
             log_msg(f"  ✓ Found {len(result.rows)} rows")
 
-            log_msg("\n📝 Generating Excel file...")
+            log_msg("\nðﾟﾓﾝ Generating Excel file...")
             progress_bar.progress(66, text="Building Excel...")
 
             output_filename = f"TPL_Comments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -530,7 +530,7 @@ if st.session_state.excel_bytes:
 # SECTION 6 — STORAGE MANAGEMENT (Footer)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("### 💾 Storage Management")
+st.markdown("### ðﾟﾒﾾ Storage Management")
 
 # Calculate storage
 def get_storage_size():
@@ -545,11 +545,11 @@ def get_storage_size():
 
 storage_mb = get_storage_size() / (1024 * 1024)
 if storage_mb >= 1024:
-    st.write(f"📊 **Current storage:** {storage_mb / 1024:.2f} GB")
+    st.write(f"ðﾟﾓﾊ **Current storage:** {storage_mb / 1024:.2f} GB")
 else:
-    st.write(f"📊 **Current storage:** {storage_mb:.2f} MB")
+    st.write(f"ðﾟﾓﾊ **Current storage:** {storage_mb:.2f} MB")
 
-if st.button("🗑️ Clear All Storage", use_container_width=True):
+if st.button("ðﾟﾗﾑ️ Clear All Storage", use_container_width=True):
     try:
         if UPLOADS_DIR.exists():
             shutil.rmtree(UPLOADS_DIR)
